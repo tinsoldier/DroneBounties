@@ -248,6 +248,7 @@ namespace DroneBounties
 
                 //MyLog.Default.WriteLine($"PvE.KillReward: CumulativeDamage: {totalDamage}.");
 
+                
                 //Figure out the proportion of total damage done by each attacker and assign their proportion of the monies
                 foreach (var attacker in validAttackers)
                 {
@@ -259,6 +260,9 @@ namespace DroneBounties
                     //MyLog.Default.WriteLine($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
 
                     //TODO: Blast out some sort of message to everyone?
+
+                    //MyAPIGateway.Multiplayer.SendMessageToServer()
+                    MyAPIGateway.Utilities.ShowMessage("PvE", $"PvE: {victimCubeGrid.DisplayName} Killed - Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
                 }
 
                 //In theory we shouldn't have to track this grid anymore, there should only be a single trophy block per grid (we're assuming)
