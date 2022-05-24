@@ -18,33 +18,33 @@ namespace DroneBounties
     partial class KillRewardSession : MySessionComponentBase
     {
         private const int DamageEventExpirationInSeconds = 300;
-        
+
         private List<IMyPlayer> Players = new List<IMyPlayer>();
         private Dictionary<long, List<GridDamageEvent>> _gridDamageEvents;
 
         //TODO: Make this externally configurable
         private List<string> _validSubtypeIds = new List<string> { "RivalAIRemoteControlLarge", "RivalAIRemoteControlSmall" };
 
-		public static WcApi WeaponCore = new WcApi(); //Register in BeforeStart
-		public static bool WeaponCoreApiLoaded = false;
+        public static WcApi WeaponCore = new WcApi(); //Register in BeforeStart
+        public static bool WeaponCoreApiLoaded = false;
 
-		public override void BeforeStart()
+        public override void BeforeStart()
         {
-			//WeaponCore.Load(WeaponCoreCallback, true);
+            //WeaponCore.Load(WeaponCoreCallback, true);
 
-			MyAPIGateway.Session.DamageSystem.RegisterAfterDamageHandler(int.MinValue, AfterDamageHandler);
+            MyAPIGateway.Session.DamageSystem.RegisterAfterDamageHandler(int.MinValue, AfterDamageHandler);
 
-		}
+        }
 
-		public static void WeaponCoreCallback()
-		{
-			if (!WeaponCore.IsReady)
-				return;
+        public static void WeaponCoreCallback()
+        {
+            if (!WeaponCore.IsReady)
+                return;
 
-			MyLog.Default.WriteLine("PvE.KillRewardSession: WeaponCore API Loaded");
-		}
+            MyLog.Default.WriteLine("PvE.KillRewardSession: WeaponCore API Loaded");
+        }
 
-		public override void LoadData()
+        public override void LoadData()
         {
             MyLog.Default.WriteLine("PvE.KillRewardSession: loading v4");
             if (!MyAPIGateway.Session.IsServer)
@@ -59,11 +59,11 @@ namespace DroneBounties
             MyVisualScriptLogicProvider.BlockDestroyed += OnBlockDestroyed;
 
 
-			MyLog.Default.WriteLine("PvE.KillRewardSession: loaded...");
+            MyLog.Default.WriteLine("PvE.KillRewardSession: loaded...");
         }
 
-		private void AfterDamageHandler(object damagedObject, MyDamageInformation damageInfo)
-		{
+        private void AfterDamageHandler(object damagedObject, MyDamageInformation damageInfo)
+        {
             try
             {
                 var victimCubeGrid = (damagedObject as IMySlimBlock)?.CubeGrid;
@@ -79,23 +79,23 @@ namespace DroneBounties
                 }
                 else
                 {
-					MyAPIGateway.Players.GetPlayers(Players);
-				}
+                    MyAPIGateway.Players.GetPlayers(Players);
+                }
 
-				var entity = MyAPIGateway.Entities.GetEntityById(attackerId);
-				var attackerCubeGrid = (entity as IMyCubeBlock)?.CubeGrid;
+                var entity = MyAPIGateway.Entities.GetEntityById(attackerId);
+                var attackerCubeGrid = (entity as IMyCubeBlock)?.CubeGrid;
 
-				//Attempt 1: Find the player ref by first matching entityId. Don't know if this is a thing.
-				IMyPlayer attackingPlayer = Players.SingleOrDefault(_player => _player.Character != null && _player.Character.EntityId == attackerId);
+                //Attempt 1: Find the player ref by first matching entityId. Don't know if this is a thing.
+                IMyPlayer attackingPlayer = Players.SingleOrDefault(_player => _player.Character != null && _player.Character.EntityId == attackerId);
 
-				//Attempt 2: Find the player by who is controlling the grid
-				if (attackingPlayer == null)
-				{
-					attackingPlayer = MyAPIGateway.Players.GetPlayerControllingEntity(attackerCubeGrid);
-				}
+                //Attempt 2: Find the player by who is controlling the grid
+                if (attackingPlayer == null)
+                {
+                    attackingPlayer = MyAPIGateway.Players.GetPlayerControllingEntity(attackerCubeGrid);
+                }
 
-				//Attempt 3: Fallback to a couple other miscellaneous methods
-				var attackerIdentityId = (attackingPlayer == null) ? GetAttackerIdentityId(attackerId) : attackingPlayer.IdentityId;
+                //Attempt 3: Fallback to a couple other miscellaneous methods
+                var attackerIdentityId = (attackingPlayer == null) ? GetAttackerIdentityId(attackerId) : attackingPlayer.IdentityId;
 
                 GridDamageEvent damageEvent = new GridDamageEvent()
                 {
@@ -124,18 +124,18 @@ namespace DroneBounties
                 {
                     gridDamageEvents.Add(damageEvent);
                 }
-			}
-			catch (Exception ex)
-			{
-				MyLog.Default.WriteLine($"PvE.KillReward.AfterDamageHandler: {ex}");
-			}
-		}
+            }
+            catch (Exception ex)
+            {
+                MyLog.Default.WriteLine($"PvE.KillReward.AfterDamageHandler: {ex}");
+            }
+        }
 
         protected override void UnloadData()
         {
             //MyVisualScriptLogicProvider.BlockDamaged -= OnBlockDamaged;
             MyVisualScriptLogicProvider.BlockDestroyed -= OnBlockDestroyed;
-		}
+        }
 
         private void OnBlockDestroyed(string entityName, string gridName, string typeId, string subtypeId)
         {
@@ -158,26 +158,26 @@ namespace DroneBounties
                 var victimRemoteBlock = (entity as IMyRemoteControl);
                 if (victimRemoteBlock == null) return;
 
-				//if (victimRemoteBlock == null || !_validSubtypeIds.Contains(subtypeId)) return;
+                //if (victimRemoteBlock == null || !_validSubtypeIds.Contains(subtypeId)) return;
 
-				//Fetch grid reference
-				var victimCubeGrid = victimRemoteBlock.CubeGrid;
-				if (victimCubeGrid == null) return;
+                //Fetch grid reference
+                var victimCubeGrid = victimRemoteBlock.CubeGrid;
+                if (victimCubeGrid == null) return;
 
-				//Test if we are even tracking damage events for the target grid, no point doing any extra work. This value is used later though.
-				var victimGridEntityId = victimCubeGrid.EntityId;
+                //Test if we are even tracking damage events for the target grid, no point doing any extra work. This value is used later though.
+                var victimGridEntityId = victimCubeGrid.EntityId;
                 if (!_gridDamageEvents.ContainsKey(victimGridEntityId))
                 {
-					MyLog.Default.WriteLine("PvE.KillReward: No damage events for grid.");
-					//unable to find any damage events for this grid. They either expired or the block was deleted/exploded for some other reason.
-					return;
+                    MyLog.Default.WriteLine("PvE.KillReward: No damage events for grid.");
+                    //unable to find any damage events for this grid. They either expired or the block was deleted/exploded for some other reason.
+                    return;
                 }
 
                 //TODO: CustomData stuff only works with specific types of functional blocks, should narrow that down in the future instead of hard coding remote controls
                 //Load bounty parameters from the custom data of the block
                 bool successful = true;
                 string result = "";
-                
+
                 //TODO: verbose, but preparing for adding additional parameters
                 //Block/grid self-defines bounty
                 int bountyOnKill = 0;
@@ -188,32 +188,32 @@ namespace DroneBounties
 
                 if (!successful)
                 {
-					//Hiding these log lines, could be spammy if most blocks don't have bounties configured??
-					//MyLog.Default.WriteLine("Unable to find bounty info in customData");
-					//MyLog.Default.WriteLine($"customData={victimRemoteBlock.CustomData}");
-					//TODO: optionally, don't bail and assign using a default bounty multiplier TBD.
-					return;
+                    //Hiding these log lines, could be spammy if most blocks don't have bounties configured??
+                    //MyLog.Default.WriteLine("Unable to find bounty info in customData");
+                    //MyLog.Default.WriteLine($"customData={victimRemoteBlock.CustomData}");
+                    //TODO: optionally, don't bail and assign using a default bounty multiplier TBD.
+                    return;
                 }
 
-				//MyLog.Default.WriteLine($"PvE.KillReward: Should issue bounty for {bountyOnKill}.");
+                //MyLog.Default.WriteLine($"PvE.KillReward: Should issue bounty for {bountyOnKill}.");
 
-				//For relations checks, we use first majority owner.
-				//TODO: Figure out what this is returning. A player identity? A faction ID?
-				var victimIdentityId = (victimCubeGrid.BigOwners != null && victimCubeGrid.BigOwners.Count > 0) ? victimCubeGrid.BigOwners[0] : 0L;
+                //For relations checks, we use first majority owner.
+                //TODO: Figure out what this is returning. A player identity? A faction ID?
+                var victimIdentityId = (victimCubeGrid.BigOwners != null && victimCubeGrid.BigOwners.Count > 0) ? victimCubeGrid.BigOwners[0] : 0L;
 
                 //TODO: Determine if it is really necessary to do this on every event? Is there not a better way to keep it in sync?
                 Players.Clear();
-				if (MyAPIGateway.Multiplayer.MultiplayerActive)
-				{
-					MyAPIGateway.Multiplayer.Players.GetPlayers(Players);
-				}
-				else
-				{
-					MyAPIGateway.Players.GetPlayers(Players);
-				}
+                if (MyAPIGateway.Multiplayer.MultiplayerActive)
+                {
+                    MyAPIGateway.Multiplayer.Players.GetPlayers(Players);
+                }
+                else
+                {
+                    MyAPIGateway.Players.GetPlayers(Players);
+                }
 
-				//Verified above that _gridDamageEvents contains the key victimGridEntityId
-				List<GridDamageEvent> gridDamageEvents;
+                //Verified above that _gridDamageEvents contains the key victimGridEntityId
+                List<GridDamageEvent> gridDamageEvents;
                 if (!_gridDamageEvents.TryGetValue(victimGridEntityId, out gridDamageEvents))
                 {
                     MyLog.Default.WriteLine("PvE.KillReward: Unable to access grid events. Concurrency issue?");
@@ -221,50 +221,50 @@ namespace DroneBounties
                     return;
                 }
 
-				//MyLog.Default.WriteLine($"PvE.KillReward: Number of damage events: {gridDamageEvents.Count}.");
+                //MyLog.Default.WriteLine($"PvE.KillReward: Number of damage events: {gridDamageEvents.Count}.");
 
-				//Group by attacker, track their cumulative damage
-				var damageByAttackers = gridDamageEvents.GroupBy(de => de.AttackerIdentityId, (attackerIdentityId, damageEvents) => new
+                //Group by attacker, track their cumulative damage
+                var damageByAttackers = gridDamageEvents.GroupBy(de => de.AttackerIdentityId, (attackerIdentityId, damageEvents) => new
                 {
                     AttackerIdentityId = attackerIdentityId,
                     CumulativeDamage = damageEvents.Sum(de2 => de2.Damage),
                     Player = Players.SingleOrDefault(p => p?.IdentityId == attackerIdentityId) //Players.SingleOrDefault(_player => _player?.IdentityId == attackerId || _player?.Character?.EntityId == attackerId)
-				});
+                });
 
-				//MyLog.Default.WriteLine($"PvE.KillReward: Number of attackers: {damageByAttackers.Count()}.");
+                //MyLog.Default.WriteLine($"PvE.KillReward: Number of attackers: {damageByAttackers.Count()}.");
 
-				//Filter out friendly fire
-				var validAttackers = damageByAttackers.Where(attacker =>
+                //Filter out friendly fire
+                var validAttackers = damageByAttackers.Where(attacker =>
                 {
                     var attackerIdentityId = attacker.AttackerIdentityId;
                     var relation = MyIDModule.GetRelationPlayerPlayer(attackerIdentityId, victimIdentityId);
                     return attacker.Player != null && relation == MyRelationsBetweenPlayers.Enemies;
                 }).ToList();
 
-				//MyLog.Default.WriteLine($"PvE.KillReward: Number of enemies: {validAttackers.Count}.");
+                //MyLog.Default.WriteLine($"PvE.KillReward: Number of enemies: {validAttackers.Count}.");
 
-				//This is how much damage was done to the grid in total by valid attackers within the last DamageEventExpirationInSeconds
-				var totalDamage = validAttackers.Sum(va => va.CumulativeDamage);
+                //This is how much damage was done to the grid in total by valid attackers within the last DamageEventExpirationInSeconds
+                var totalDamage = validAttackers.Sum(va => va.CumulativeDamage);
 
-				//MyLog.Default.WriteLine($"PvE.KillReward: CumulativeDamage: {totalDamage}.");
+                //MyLog.Default.WriteLine($"PvE.KillReward: CumulativeDamage: {totalDamage}.");
 
-				//Figure out the proportion of total damage done by each attacker and assign their proportion of the monies
-				foreach (var attacker in validAttackers)
+                //Figure out the proportion of total damage done by each attacker and assign their proportion of the monies
+                foreach (var attacker in validAttackers)
                 {
                     var proportionalDamage = attacker.CumulativeDamage / totalDamage;
-					var proportionalBounty = (long)(proportionalDamage * bountyOnKill);
+                    var proportionalBounty = (long)(proportionalDamage * bountyOnKill);
 
-					attacker.Player.RequestChangeBalance(proportionalBounty);
+                    attacker.Player.RequestChangeBalance(proportionalBounty);
 
-					//MyLog.Default.WriteLine($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
+                    //MyLog.Default.WriteLine($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
 
-					//TODO: Blast out some sort of message to everyone?
-				}
+                    //TODO: Blast out some sort of message to everyone?
+                }
 
                 //In theory we shouldn't have to track this grid anymore, there should only be a single trophy block per grid (we're assuming)
                 _gridDamageEvents.Remove(victimGridEntityId);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 MyLog.Default.WriteLine($"PvE.KillReward.OnBlockDestroyed: {ex}");
             }
@@ -304,7 +304,7 @@ namespace DroneBounties
                 List<GridDamageEvent> gridDamageEvents = null;
                 if (_gridDamageEvents.ContainsKey(victimCubeGrid.EntityId))
                 {
-                    if(!_gridDamageEvents.TryGetValue(victimCubeGrid.EntityId, out gridDamageEvents))
+                    if (!_gridDamageEvents.TryGetValue(victimCubeGrid.EntityId, out gridDamageEvents))
                     {
                         MyLog.Default.WriteLine("PvE.KillReward: Unable to access grid events. Concurrency issue?");
                         //TODO: Realistic issue?
@@ -342,7 +342,7 @@ namespace DroneBounties
         }
 
         #region Helper Statics
-        internal static bool CustomDataToConfig(string input, ref string output, string search) 
+        internal static bool CustomDataToConfig(string input, ref string output, string search)
         {
             //Keep method static and regex cache will re-use compiled version
             MatchCollection matchcollection = Regex.Matches(input, search + @"\s?=\s?(.+?);", RegexOptions.Compiled);
@@ -366,15 +366,15 @@ namespace DroneBounties
 
         // Borrowed from: https://steamcommunity.com/sharedfiles/filedetails/?id=2495746295 Unsure if they were original author of this method.
         // My understanding is it's getting the identity of the person controlling a block that has done the damage, or it's the identity of the charcter holding the gun
-        internal static long GetAttackerIdentityId(long attackerId) 
+        internal static long GetAttackerIdentityId(long attackerId)
         {
             var entity = MyAPIGateway.Entities.GetEntityById(attackerId);
-            
-			var cubeGrid = entity as IMyCubeGrid;
+
+            var cubeGrid = entity as IMyCubeGrid;
             if (cubeGrid != null) return (cubeGrid.BigOwners.Count > 0) ? cubeGrid.BigOwners[0] : 0;
 
-			var myControllableEntity = entity as VRage.Game.ModAPI.Interfaces.IMyControllableEntity;
-			if (myControllableEntity != null)
+            var myControllableEntity = entity as VRage.Game.ModAPI.Interfaces.IMyControllableEntity;
+            if (myControllableEntity != null)
             {
                 var controllerInfo = myControllableEntity.ControllerInfo;
 
