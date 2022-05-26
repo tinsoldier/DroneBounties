@@ -56,6 +56,8 @@ namespace DroneBounties
                 UpdatePlayers();         
                 ProcessQueuedDamageInfo();
                 ProcessQueuedKills();
+
+                _lastRunTicks = DateTime.Now.Ticks;
             }
         }
 
