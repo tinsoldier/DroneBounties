@@ -63,61 +63,71 @@ namespace DroneBounties
 
         public void ProcessQueuedDamageInfo()
         {
-            foreach(var victimEntityId in _damageInfos.Keys)
+            try
             {
-                List<MyDamageInformation> myDamages;
-                if(_damageInfos.TryGetValue(victimEntityId, out myDamages))
+                foreach (var victimEntityId in _damageInfos.Keys)
                 {
-                    var attackerDamageInfo = myDamages.GroupBy(md => md.AttackerId);
-                    foreach(var attackerGroup in attackerDamageInfo)
+                    List<MyDamageInformation> myDamages;
+                    if (_damageInfos.TryGetValue(victimEntityId, out myDamages))
                     {
-                        var attackerId = attackerGroup.Key;
-                        var damage = attackerGroup.Sum(md => md.Amount);
-
-                        var entity = MyAPIGateway.Entities.GetEntityById(attackerId);
-                        var attackerCubeGrid = (entity as IMyCubeBlock)?.CubeGrid;
-
-                        //Attempt 1: Find the player ref by first matching entityId. Don't know if this is a thing.
-                        IMyPlayer attackingPlayer = Players.SingleOrDefault(_player => _player.Character != null && _player.Character.EntityId == attackerId);
-
-                        //Attempt 2: Find the player by who is controlling the grid
-                        if (attackingPlayer == null)
+                        var attackerDamageInfo = myDamages.GroupBy(md => md.AttackerId);
+                        foreach (var attackerGroup in attackerDamageInfo)
                         {
-                            attackingPlayer = MyAPIGateway.Players.GetPlayerControllingEntity(attackerCubeGrid);
-                        }
+                            var attackerId = attackerGroup.Key;
+                            var damage = attackerGroup.Sum(md => md.Amount);
 
-                        //Attempt 3: Fallback to a couple other miscellaneous methods
-                        var attackerIdentityId = (attackingPlayer == null) ? GetAttackerIdentityId(attackerId) : attackingPlayer.IdentityId;
+                            var entity = MyAPIGateway.Entities.GetEntityById(attackerId);
+                            var attackerCubeGrid = (entity as IMyCubeBlock)?.CubeGrid;
 
-                        GridDamagedEvent damageEvent = new GridDamagedEvent()
-                        {
-                            AttackerIdentityId = attackerIdentityId, // I did the damage
-                            VictimEntityId = victimEntityId, // I was damaged
-                            Damage = damage, // How much damage
-                            TimestampTicks = DateTime.Now.Ticks // When the damage was done (somewhat close, anyhow)
-                        };
+                            //Attempt 1: Find the player ref by first matching entityId. Don't know if this is a thing.
+                            IMyPlayer attackingPlayer = Players.SingleOrDefault(_player => _player.Character != null && _player.Character.EntityId == attackerId);
 
-                        List<GridDamagedEvent> gridDamageEvents = null;
-                        if (_gridDamageEvents.ContainsKey(victimEntityId))
-                        {
-                            if (!_gridDamageEvents.TryGetValue(victimEntityId, out gridDamageEvents))
+                            //Attempt 2: Find the player by who is controlling the grid
+                            if (attackingPlayer == null)
                             {
-                                MyLog.Default.WriteLine("PvE.KillReward: Unable to access grid events. Concurrency issue?");
-                                //TODO: Realistic issue?
+                                attackingPlayer = MyAPIGateway.Players.GetPlayerControllingEntity(attackerCubeGrid);
                             }
-                        }
-                        else
-                        {
-                            gridDamageEvents = new List<GridDamagedEvent>();
-                            _gridDamageEvents.Add(victimEntityId, gridDamageEvents);
-                        }
 
-                        if (gridDamageEvents != null)
-                        {
-                            gridDamageEvents.Add(damageEvent);
+                            //Attempt 3: Fallback to a couple other miscellaneous methods
+                            var attackerIdentityId = (attackingPlayer == null) ? GetAttackerIdentityId(attackerId) : attackingPlayer.IdentityId;
+
+                            GridDamagedEvent damageEvent = new GridDamagedEvent()
+                            {
+                                AttackerIdentityId = attackerIdentityId, // I did the damage
+                                VictimEntityId = victimEntityId, // I was damaged
+                                Damage = damage, // How much damage
+                                TimestampTicks = DateTime.Now.Ticks // When the damage was done (somewhat close, anyhow)
+                            };
+
+                            List<GridDamagedEvent> gridDamageEvents = null;
+                            if (_gridDamageEvents.ContainsKey(victimEntityId))
+                            {
+                                if (!_gridDamageEvents.TryGetValue(victimEntityId, out gridDamageEvents))
+                                {
+                                    MyLog.Default.WriteLine("PvE.KillReward: Unable to access grid events. Concurrency issue?");
+                                    //TODO: Realistic issue?
+                                }
+                            }
+                            else
+                            {
+                                gridDamageEvents = new List<GridDamagedEvent>();
+                                _gridDamageEvents.Add(victimEntityId, gridDamageEvents);
+                            }
+
+                            if (gridDamageEvents != null)
+                            {
+                                gridDamageEvents.Add(damageEvent);
+                            }
                         }
                     }
                 }
+
+                //We have processed all of the DamageInfos, go ahead and clear the list.
+                _damageInfos.Clear();
+            }
+            catch (Exception ex)
+            {
+                MyLog.Default.WriteLine($"PvE.KillReward.ProcessQueuedDamageInfo: {ex}");
             }
         }
 
