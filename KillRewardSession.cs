@@ -19,12 +19,9 @@ namespace DroneBounties
         private const int DamageEventExpirationInSeconds = 300;
 
         private List<IMyPlayer> Players = new List<IMyPlayer>();
-
-        //My understanding is these scripts are not multi-threaded on the server so concurrency isn't an issue. As such ConcurrentDictionary is not necessary.
         private Dictionary<long, List<GridDamagedEvent>> _gridDamageEvents = new Dictionary<long, List<GridDamagedEvent>>();
         private Dictionary<long, List<MyDamageInformation>> _damageInfos = new Dictionary<long, List<MyDamageInformation>>();
         private Dictionary<long, List<GridDestroyedEvent>> _blockDestroyedEvents = new Dictionary<long, List<GridDestroyedEvent>>();
-
         //TODO: Make this externally configurable
         private List<string> _validSubtypeIds = new List<string> { "RivalAIRemoteControlLarge", "RivalAIRemoteControlSmall" };
 
@@ -94,15 +91,6 @@ namespace DroneBounties
                             //Attempt 3: Fallback to a couple other miscellaneous methods
                             var attackerIdentityId = (attackingPlayer == null) ? GetAttackerIdentityId(attackerId) : attackingPlayer.IdentityId;
 
-                            //Graceful failure if necessary
-                            if(attackerIdentityId == 0)
-                            {
-                                //Some sort of edge case. Perhaps NPC vs NPC or our methods for determining the player were not sufficiently exhaustive.
-                                //TODO: If this was NPC vs NPC, do we let the NPC/null entity sap damage proportion and reduce the final reward? Ideally this would be configurable.
-                                //MyLog.Default.WriteLine("Unable to determine player identity for a damage event.");
-                                continue;
-                            }
-
                             GridDamagedEvent damageEvent = new GridDamagedEvent()
                             {
                                 AttackerIdentityId = attackerIdentityId, // I did the damage
@@ -111,23 +99,19 @@ namespace DroneBounties
                                 TimestampTicks = DateTime.Now.Ticks // When the damage was done (somewhat close, anyhow)
                             };
 
-                            // Check if the victimEntityId exists in the dictionary.
-                            // If it does not exist, create a new list and add it to the dictionary.
-                            // If it does exist, retrieve the existing list.
-                            if (!_gridDamageEvents.TryGetValue(victimEntityId, out List<GridDamagedEvent> gridDamageEvents))
+                            List<GridDamagedEvent> gridDamageEvents = null;
+                            if (_gridDamageEvents.ContainsKey(victimEntityId))
                             {
-                                // The key does not exist in the dictionary.
-                                // Create a new list for gridDamageEvents.
-                                gridDamageEvents = new List<GridDamagedEvent>();
-
-                                // Add the new list to the dictionary with the victimEntityId as the key.
-                                _gridDamageEvents.Add(victimEntityId, gridDamageEvents);
+                                if (!_gridDamageEvents.TryGetValue(victimEntityId, out gridDamageEvents))
+                                {
+                                    MyLog.Default.WriteLine("PvE.KillReward: Unable to access grid events. Concurrency issue?");
+                                    //TODO: Realistic issue?
+                                }
                             }
                             else
                             {
-                                // The key exists in the dictionary.
-                                // gridDamageEvents now contains the list associated with victimEntityId.
-                                // MyLog.Default.WriteLine($"Existing events count for {victimEntityId}: {gridDamageEvents.Count}");
+                                gridDamageEvents = new List<GridDamagedEvent>();
+                                _gridDamageEvents.Add(victimEntityId, gridDamageEvents);
                             }
 
                             if (gridDamageEvents != null)
@@ -226,14 +210,11 @@ namespace DroneBounties
                     var proportionalDamage = attacker.CumulativeDamage / totalDamage;
                     var proportionalBounty = (long)(proportionalDamage * bountyOnKill);
 
-                    if (proportionalBounty > 0)
-                    {
-                        attacker.Player.RequestChangeBalance(proportionalBounty);
+                    attacker.Player.RequestChangeBalance(proportionalBounty);
 
-                        //MyLog.Default.WriteLine($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
+                    //MyLog.Default.WriteLine($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
 
-                        MyAPIGateway.Utilities.ShowMessage("PvE", $"{victimGridName} Killed - Assigning {proportionalBounty} bounty to {attacker.Player.DisplayName}.");
-                    }
+                    MyAPIGateway.Utilities.ShowMessage("PvE", $"{victimGridName} Killed - Assigning {proportionalBounty} bounty to {attacker.Player.DisplayName}.");
                 }
 
                 //In theory we shouldn't have to track this grid anymore, there should only be a single trophy block per grid (we're assuming)
@@ -274,7 +255,7 @@ namespace DroneBounties
 
         private void OnBlockDestroyed(string entityName, string gridName, string typeId, string subtypeId)
         {
-            //No attackerId, so instead we track list of attackers in OnDamage and their damage in a dictionary and then assign rewards on "kill" appropriately
+            //No attackerId, so instead we track list of attackers in OnDamage and they're damage in a dictionary and then assign rewards on "kill" appropriately
 
             // Damage events were refactored to be clustered together better. Unfortunately, that forces us to do the same with block destroyed events
             // or they could happen *before* the damage events are all fully processed.
@@ -293,8 +274,8 @@ namespace DroneBounties
                 var victimRemoteBlock = (entity as IMyRemoteControl);
                 if (victimRemoteBlock == null) return;
 
-                // TODO: Verify if MESApi is valid and loaded, before we enforce the Rival AI subtypes
-                if (victimRemoteBlock == null || !_validSubtypeIds.Contains(subtypeId)) return;
+                // TODO: If MESApi is valid and loaded, we should enforce the Rival AI subtypes
+                //if (victimRemoteBlock == null || !_validSubtypeIds.Contains(subtypeId)) return;
 
                 //Fetch grid reference
                 var victimCubeGrid = victimRemoteBlock.CubeGrid;
@@ -404,7 +385,7 @@ namespace DroneBounties
         }
 
         // Borrowed from: https://steamcommunity.com/sharedfiles/filedetails/?id=2495746295 Unsure if they were original author of this method.
-        // My understanding is it's getting the identity of the person controlling a block that has done the damage, or it's the identity of the character holding the gun
+        // My understanding is it's getting the identity of the person controlling a block that has done the damage, or it's the identity of the charcter holding the gun
         internal static long GetAttackerIdentityId(long attackerId)
         {
             var entity = MyAPIGateway.Entities.GetEntityById(attackerId);
