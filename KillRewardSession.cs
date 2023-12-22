@@ -210,11 +210,12 @@ namespace DroneBounties
                     var proportionalDamage = attacker.CumulativeDamage / totalDamage;
                     var proportionalBounty = (long)(proportionalDamage * bountyOnKill);
 
-                    attacker.Player.RequestChangeBalance(proportionalBounty);
-
-                    //MyLog.Default.WriteLine($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
-
-                    MyAPIGateway.Utilities.ShowMessage("PvE", $"{victimGridName} Killed - Assigning {proportionalBounty} bounty to {attacker.Player.DisplayName}.");
+                    if (proportionalBounty > 0)
+                    {
+                        attacker.Player.RequestChangeBalance(proportionalBounty);
+                        //MyLog.Default.WriteLine($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
+                        MyAPIGateway.Utilities.ShowMessage("PvE", $"{victimGridName} Killed - Assigning {proportionalBounty} bounty to {attacker.Player.DisplayName}.");
+                    }
                 }
 
                 //In theory we shouldn't have to track this grid anymore, there should only be a single trophy block per grid (we're assuming)
