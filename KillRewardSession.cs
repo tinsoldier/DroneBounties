@@ -262,6 +262,9 @@ namespace DroneBounties
             // However, it's unclear what the lifecycle of destroyed blocks is and how much can actually be deferred, so we'll do some key things here that
             // assume the worst, the targets are dead and inaccessible once we leave this function.
 
+            //Log all function parameters for debug purposes
+            //MyLog.Default.WriteLine($"PvE.KillReward.OnBlockDestroyed: entityName={entityName}, gridName={gridName}, typeId={typeId}, subtypeId={subtypeId}");
+
             try
             {
                 if (entityName.Length == 0) return;
@@ -272,10 +275,12 @@ namespace DroneBounties
 
                 //Require victim block to be a remote control, and specifically one of the Rival AI ones (by default)
                 var victimRemoteBlock = (entity as IMyRemoteControl);
-                if (victimRemoteBlock == null) return;
-
                 // TODO: If MESApi is valid and loaded, we should enforce the Rival AI subtypes
-                //if (victimRemoteBlock == null || !_validSubtypeIds.Contains(subtypeId)) return;
+                if (victimRemoteBlock == null || !_validSubtypeIds.Contains(subtypeId))
+                {
+                    //MyLog.Default.WriteLine($"PvE.KillReward.OnBlockDestroyed: Block is of type {subtypeId}");
+                    return;
+                };
 
                 //Fetch grid reference
                 var victimCubeGrid = victimRemoteBlock.CubeGrid;
