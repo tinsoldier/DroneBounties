@@ -178,6 +178,7 @@ namespace DroneBounties
                 }
 
                 //MyLog.Default.WriteLine($"PvE.KillReward: Number of damage events: {gridDamageEvents.Count}.");
+                //MyLog.Default.WriteLine($"PvE.KillReward: Grid damage: {gridDamageEvents.Sum(gd => gd.Damage)}.");
 
                 //Group by attacker, track their cumulative damage
                 var damageByAttackers = gridDamageEvents.GroupBy(de => de.AttackerIdentityId, (attackerIdentityId, damageEvents) => new
@@ -410,8 +411,27 @@ namespace DroneBounties
         {
             var entity = MyAPIGateway.Entities.GetEntityById(attackerId);
 
-            var cubeGrid = entity as IMyCubeGrid;
-            if (cubeGrid != null) return (cubeGrid.BigOwners.Count > 0) ? cubeGrid.BigOwners[0] : 0;
+            if (entity == null) return 0L;
+
+            //TODO Determine if this is a valid case, and if so, how to handle it.
+            //if(entity is IMyCharacter)
+            //{
+            //    var character = entity as IMyCharacter;
+            //    MyLog.Default.WriteLine($"PvE.KillReward.GetAttackerIdentityId: Attacker is player.");
+            //    return character.EntityId;
+            //}
+
+            if (entity is IMyCubeGrid)
+            {
+                var cubeGrid = entity as IMyCubeGrid;
+                if (cubeGrid != null) return (cubeGrid.BigOwners.Count > 0) ? cubeGrid.BigOwners[0] : 0; 
+            }
+
+            if(entity is IMyCubeBlock)
+            {
+                var cubeGrid = (entity as IMyCubeBlock).CubeGrid;
+                if (cubeGrid != null) return (cubeGrid.BigOwners.Count > 0) ? cubeGrid.BigOwners[0] : 0;
+            }
 
             var myControllableEntity = entity as VRage.Game.ModAPI.Interfaces.IMyControllableEntity;
             if (myControllableEntity != null)
