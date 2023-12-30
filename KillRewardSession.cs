@@ -268,7 +268,7 @@ namespace DroneBounties
 
             try
             {
-                if (entityName.Length == 0) return;
+                if (string.IsNullOrEmpty(entityName)) return;
 
                 //TODO: Verify if this is simply returning the block type, or the actual instance?
                 var entity = MyAPIGateway.Entities.GetEntityByName(entityName);
@@ -334,7 +334,7 @@ namespace DroneBounties
             }
             catch (Exception ex)
             {
-                MyLog.Default.WriteLine($"PvE.KillReward.OnBlockDestroyed: {ex}");
+                //MyLog.Default.WriteLine($"PvE.KillReward.OnBlockDestroyed: {ex}");
             }
         }
 
@@ -370,20 +370,34 @@ namespace DroneBounties
         #region Helper Statics
         internal static bool CustomDataToConfig(string input, ref string output, string search)
         {
-            //Keep method static and regex cache will re-use compiled version
-            MatchCollection matchcollection = Regex.Matches(input, search + @"\s?=\s?(.+?);", RegexOptions.Compiled);
-            foreach (Match match in matchcollection)
+            if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(search))
             {
-                if (match.Groups.Count == 2)
-                {
-                    output = (match.Groups[1].Value.Trim());
-                    return true;
-                }
-                else
-                    return false;
+                return false;
             }
+
+            try
+            {
+                // Keep method static and regex cache will re-use compiled version
+                MatchCollection matchCollection = Regex.Matches(input, search + @"\s?=\s?(.+?);", RegexOptions.Compiled);
+
+                foreach (Match match in matchCollection)
+                {
+                    if (match.Groups.Count == 2)
+                    {
+                        output = match.Groups[1].Value.Trim();
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                //MyLog.Default.WriteLine($"PvE.KillReward.CustomDataToConfig: {ex}");
+                return false;
+            }
+
             return false;
         }
+
 
         public static bool IsIdentityPlayer(long id)
         {
