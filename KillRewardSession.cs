@@ -1,4 +1,5 @@
-﻿using Sandbox.Game;
+﻿using Sandbox.Common.ObjectBuilders;
+using Sandbox.Game;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Weapons;
 using Sandbox.ModAPI;
@@ -9,6 +10,8 @@ using System.Text.RegularExpressions;
 using VRage.Game.Components;
 using VRage.Game.Entity;
 using VRage.Game.ModAPI;
+using VRage.ModAPI;
+using VRage.ObjectBuilders;
 using VRage.Utils;
 
 namespace DroneBounties
@@ -16,7 +19,10 @@ namespace DroneBounties
     [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
     partial class KillRewardSession : MySessionComponentBase
     {
+        public static KillRewardSession Instance;
         private const int DamageEventExpirationInSeconds = 300;
+
+        public List<IMyRemoteControl> RemoteControls = new List<IMyRemoteControl>();
 
         private List<IMyPlayer> Players = new List<IMyPlayer>();
         private Dictionary<long, List<GridDamagedEvent>> _gridDamageEvents = new Dictionary<long, List<GridDamagedEvent>>();
@@ -30,21 +36,22 @@ namespace DroneBounties
 
         public override void BeforeStart()
         {
+            Instance = this;
             MyAPIGateway.Session.DamageSystem.RegisterAfterDamageHandler(int.MinValue, AfterDamageHandler);
         }
 
         public override void LoadData()
         {
-            MyLog.Default.WriteLine("PvE.KillRewardSession: loading v4");
+            MyLog.Default.WriteLine("PvE.KillReward: loading v4");
             if (!MyAPIGateway.Session.IsServer)
             {
-                MyLog.Default.WriteLine("PvE.KillRewardSession: Canceling load, not a server.");
+                MyLog.Default.WriteLine("PvE.KillReward: Canceling load, not a server.");
                 return;
             }
 
             MyVisualScriptLogicProvider.BlockDestroyed += OnBlockDestroyed;
 
-            MyLog.Default.WriteLine("PvE.KillRewardSession: loaded...");
+            MyLog.Default.WriteLine("PvE.KillReward: loaded...");
         }
 
         public override void UpdateAfterSimulation()
@@ -177,8 +184,8 @@ namespace DroneBounties
                     return;
                 }
 
-                //MyLog.Default.WriteLine($"PvE.KillReward: Number of damage events: {gridDamageEvents.Count}.");
-                //MyLog.Default.WriteLine($"PvE.KillReward: Grid damage: {gridDamageEvents.Sum(gd => gd.Damage)}.");
+                DebugWriteToLog($"PvE.KillReward: Number of damage events: {gridDamageEvents.Count}.");
+                DebugWriteToLog($"PvE.KillReward: Grid damage: {gridDamageEvents.Sum(gd => gd.Damage)}.");
 
                 //Group by attacker, track their cumulative damage
                 var damageByAttackers = gridDamageEvents.GroupBy(de => de.AttackerIdentityId, (attackerIdentityId, damageEvents) => new
@@ -188,7 +195,7 @@ namespace DroneBounties
                     Player = Players.SingleOrDefault(p => p?.IdentityId == attackerIdentityId)
                 });
 
-                //MyLog.Default.WriteLine($"PvE.KillReward: Number of attackers: {damageByAttackers.Count()}.");
+                DebugWriteToLog($"PvE.KillReward: Number of attackers: {damageByAttackers.Count()}.");
 
                 //Filter out friendly fire
                 var validAttackers = damageByAttackers.Where(attacker =>
@@ -198,12 +205,12 @@ namespace DroneBounties
                     return attacker.Player != null && relation == MyRelationsBetweenPlayers.Enemies;
                 }).ToList();
 
-                //MyLog.Default.WriteLine($"PvE.KillReward: Number of enemies: {validAttackers.Count}.");
+                DebugWriteToLog($"PvE.KillReward: Number of enemies: {validAttackers.Count}.");
 
                 //This is how much damage was done to the grid in total by valid attackers within the last DamageEventExpirationInSeconds
                 var totalDamage = validAttackers.Sum(va => va.CumulativeDamage);
 
-                //MyLog.Default.WriteLine($"PvE.KillReward: CumulativeDamage: {totalDamage}.");
+                DebugWriteToLog($"PvE.KillReward: CumulativeDamage: {totalDamage}.");
                 
                 //Figure out the proportion of total damage done by each attacker and assign their proportion of the monies
                 foreach (var attacker in validAttackers)
@@ -211,10 +218,14 @@ namespace DroneBounties
                     var proportionalDamage = attacker.CumulativeDamage / totalDamage;
                     var proportionalBounty = (long)(proportionalDamage * bountyOnKill);
 
+                    DebugWriteToLog($"PvE.KillReward: ProportionalDamage: {proportionalDamage}.");
+                    DebugWriteToLog($"PvE.KillReward: ProportionalBounty: {proportionalBounty}.");
+
+
                     if (proportionalBounty > 0)
                     {
                         attacker.Player.RequestChangeBalance(proportionalBounty);
-                        //MyLog.Default.WriteLine($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
+                        //DebugWriteToLog($"PvE.KillReward: Assigning {proportionalBounty} to {attacker.Player.DisplayName}.");
                         MyAPIGateway.Utilities.ShowMessage("PvE", $"{victimGridName} Killed - Assigning {proportionalBounty} bounty to {attacker.Player.DisplayName}.");
                     }
                 }
@@ -265,7 +276,7 @@ namespace DroneBounties
             // assume the worst, the targets are dead and inaccessible once we leave this function.
 
             //Log all function parameters for debug purposes
-            //MyLog.Default.WriteLine($"PvE.KillReward.OnBlockDestroyed: entityName={entityName}, gridName={gridName}, typeId={typeId}, subtypeId={subtypeId}");
+            DebugWriteToLog($"PvE.KillReward.OnBlockDestroyed: entityName={entityName}, gridName={gridName}, typeId={typeId}, subtypeId={subtypeId}");
 
             try
             {
@@ -369,6 +380,12 @@ namespace DroneBounties
         }
 
         #region Helper Statics
+
+        internal static void DebugWriteToLog(string message)
+        {
+            //MyLog.Default.WriteLine(message);
+        }
+
         internal static bool CustomDataToConfig(string input, ref string output, string search)
         {
             if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(search))
@@ -452,5 +469,84 @@ namespace DroneBounties
             return 0L;
         }
         #endregion
+
+        public void OnMarkClose(IMyEntity entity)
+        {
+            try
+            {
+                var remote = entity as IMyRemoteControl;
+                if (remote == null) return;
+
+                MyLog.Default.WriteLine($"KillReward.OnMarkClose: Block marked for close, triggering payout");
+
+                // Process the bounty logic based on the remote block removal.
+                ProcessRemoteClose(remote);
+
+                // Unsubscribe the event handler.
+                remote.OnMarkForClose -= OnMarkClose;
+
+                // Remove the remote from the tracked list.
+                if (RemoteControls.Contains(remote))
+                {
+                    RemoteControls.Remove(remote);
+                }
+            }
+            catch (Exception ex)
+            {
+                MyLog.Default.WriteLine($"KillReward.OnMarkClose: {ex}");
+            }
+        }
+
+        private void ProcessRemoteClose(IMyRemoteControl remoteBlock)
+        {
+            // Retrieve the grid and validate.
+            var grid = remoteBlock.CubeGrid;
+            if (grid == null) return;
+            long gridEntityId = grid.EntityId;
+
+            // Use the grid’s primary owner as the victim identity.
+            long victimIdentityId = (grid.BigOwners != null && grid.BigOwners.Count > 0) ? grid.BigOwners[0] : 0L;
+
+            // Retrieve bounty settings from the remote block’s custom data.
+            string result = "";
+            int bountyOnKill = 0;
+            if (!KillRewardSession.CustomDataToConfig(remoteBlock.CustomData, ref result, "BountyOnKill") ||
+                !int.TryParse(result, out bountyOnKill))
+            {
+                return;
+            }
+
+            // Finally, process the kill reward.
+            ProcessQueuedKill(gridEntityId, victimIdentityId, bountyOnKill, grid.DisplayName);
+        }
+    }
+
+    [MyEntityComponentDescriptor(typeof(MyObjectBuilder_RemoteControl), false, "RivalAIRemoteControlLarge", "RivalAIRemoteControlSmall")]
+    public class NpcRemoteControlLogic : MyGameLogicComponent
+    {
+        public IMyRemoteControl remoteControl;
+        private bool isServer;
+
+        public override void Init(MyObjectBuilder_EntityBase objectBuilder)
+        {
+            base.Init(objectBuilder);
+
+            NeedsUpdate |= MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
+        }
+
+        public override void UpdateOnceBeforeFrame()
+        {
+            isServer = MyAPIGateway.Session.IsServer;
+            remoteControl = Entity as IMyRemoteControl;
+            if (remoteControl == null) return;
+            if (!isServer) return;
+
+            //MyLog.Default.WriteLine($"KillRewardSession.UpdateOnceBeforeFrame: Registering block");
+
+            if (!KillRewardSession.Instance.RemoteControls.Contains(remoteControl))
+                KillRewardSession.Instance.RemoteControls.Add(remoteControl);
+
+            remoteControl.OnMarkForClose += KillRewardSession.Instance.OnMarkClose;
+        }
     }
 }
